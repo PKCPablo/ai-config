@@ -6,35 +6,56 @@
 .DESCRIPTION
     This script removes the symbolic links created by install.ps1.
 
-.PARAMETER TargetPath
+.PARAMETER Repo
     The path to the target project where ai-config is installed.
     If not provided, uses the current directory.
 
+.PARAMETER DryRun
+    Show what would be done without making any changes.
+
 .EXAMPLE
-    .\uninstall.ps1 -TargetPath "C:\projects\my-project"
+    .\uninstall.ps1 --repo "C:\projects\my-project" --dry-run
+
+.EXAMPLE
+    .\uninstall.ps1 --repo "C:\projects\my-project"
 #>
 
+[CmdletBinding()]
 param(
-    [string]$TargetPath = "."
+    [Parameter()]
+    [Alias("r")]
+    [string]$Repo = ".",
+
+    [Parameter()]
+    [switch]$DryRun
 )
 
 # Colors for output
 $Green = "`e[32m"
 $Yellow = "`e[33m"
 $Red = "`e[31m"
+$Cyan = "`e[36m"
 $Reset = "`e[0m"
 
 function Write-Success { param([string]$Message) Write-Host "${Green}✓${Reset} $Message" }
 function Write-Warning { param([string]$Message) Write-Host "${Yellow}⚠${Reset} $Message" }
 function Write-Error { param([string]$Message) Write-Host "${Red}✗${Reset} $Message" }
+function Write-Info { param([string]$Message) Write-Host "${Cyan}ℹ${Reset} $Message" }
+function Write-DryRun { param([string]$Message) Write-Host "${Cyan}[DRY-RUN]${Reset} $Message" }
 
-# Resolve paths to absolute paths
-$TargetPath = Resolve-Path $TargetPath | Select-Object -ExpandProperty Path
+# Resolve repo path
+$Repo = Resolve-Path $Repo | Select-Object -ExpandProperty Path
 
 Write-Host ""
 Write-Host "=== AI-Config Uninstaller ==="
 Write-Host ""
-Write-Host "Target path: $TargetPath"
+
+if ($DryRun) {
+    Write-Host "${Cyan}DRY RUN MODE - No changes will be made${Reset}"
+    Write-Host ""
+}
+
+Write-Host "Target repo: $Repo"
 Write-Host ""
 
 # Links to remove
@@ -46,44 +67,72 @@ $links = @(
     "AGENTS.md"
 )
 
-$successCount = 0
-$notFoundCount = 0
+# Track results
+$results = @{
+    Removed = @()
+    NotFound = @()
+    Skipped = @()
+}
 
 foreach ($link in $links) {
-    $targetPath = Join-Path $TargetPath $link
+    $targetPath = Join-Path $Repo $link
 
     if (Test-Path $targetPath) {
         $item = Get-Item $targetPath
-        if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            # It's a symlink, remove it
-            Remove-Item $targetPath -Force
-            Write-Success "Removed symlink: $link"
-            $successCount++
+        $isSymlink = $item.Attributes -band [System.IO.FileAttributes]::ReparsePoint
+
+        if ($isSymlink) {
+            if ($DryRun) {
+                Write-DryRun "Would remove symlink: $link"
+                $results.Removed += $link
+            } else {
+                Remove-Item $targetPath -Force
+                Write-Success "Removed symlink: $link"
+                $results.Removed += $link
+            }
         } else {
             Write-Warning "Not a symlink (skipping): $link"
+            $results.Skipped += $link
         }
     } else {
-        $notFoundCount++
+        $results.NotFound += $link
     }
 }
 
 # Clean up empty .opencode directory if it exists
-$openCodePath = Join-Path $TargetPath ".opencode"
+$openCodePath = Join-Path $Repo ".opencode"
 if (Test-Path $openCodePath) {
     $children = Get-ChildItem $openCodePath -ErrorAction SilentlyContinue
     if (-not $children) {
-        Remove-Item $openCodePath -Force
-        Write-Success "Removed empty directory: .opencode"
+        if ($DryRun) {
+            Write-DryRun "Would remove empty directory: .opencode"
+        } else {
+            Remove-Item $openCodePath -Force
+            Write-Success "Removed empty directory: .opencode"
+        }
     }
 }
 
 Write-Host ""
 Write-Host "=== Uninstallation Summary ==="
 Write-Host ""
-Write-Success "Removed $successCount symlinks"
-if ($notFoundCount -gt 0) {
-    Write-Warning "$notFoundCount links not found"
+
+if ($results.Removed.Count -gt 0) {
+    Write-Success "Removed: $($results.Removed.Count) symlinks"
 }
+if ($results.Skipped.Count -gt 0) {
+    Write-Warning "Skipped: $($results.Skipped.Count) non-symlinks"
+}
+if ($results.NotFound.Count -gt 0) {
+    Write-Info "Not found: $($results.NotFound.Count) links"
+}
+
 Write-Host ""
-Write-Host "ai-config has been uninstalled from this project."
+
+if ($DryRun) {
+    Write-Host "${Cyan}This was a dry run. No changes were made.${Reset}"
+} else {
+    Write-Host "ai-config has been uninstalled from this project."
+}
+
 Write-Host ""

@@ -6,6 +6,8 @@ Configuration files and settings for AI tools and agents.
 
 This repository contains configuration files, prompts, and settings for various AI tools and workflows. It can be installed into other projects using symbolic links (symlinks), allowing you to maintain a single source of truth for your AI configurations across multiple projects.
 
+**Conservative by design**: The installer never overwrites existing files. It only creates symlinks where nothing exists, and skips everything else.
+
 ## Repository Structure
 
 ```
@@ -30,41 +32,72 @@ ai-config/
 - **Windows**: PowerShell with Administrator privileges
 - **Linux/Mac**: Bash shell
 
-### Windows
+### Quick Start
 
-1. Clone this repository:
-```powershell
+```bash
+# Clone the repository
 git clone https://github.com/PKCPablo/ai-config.git
 cd ai-config
+
+# Preview what will be installed (dry-run)
+./install.sh --repo /path/to/your/project --dry-run
+
+# Install
+./install.sh --repo /path/to/your/project
 ```
 
-2. Run the installer from an elevated (Administrator) PowerShell:
-```powershell
-.\install.ps1 -TargetPath "C:\path\to\your\project"
-```
+### Windows
 
-Or to install in the current directory:
 ```powershell
+# Preview what will be installed (dry-run)
+.\install.ps1 --repo "C:\path\to\your\project" --dry-run
+
+# Install
+.\install.ps1 --repo "C:\path\to\your\project"
+
+# Or install in the current directory
 .\install.ps1
 ```
 
 ### Linux/Mac
 
-1. Clone this repository:
 ```bash
-git clone https://github.com/PKCPablo/ai-config.git
-cd ai-config
-```
+# Preview what will be installed (dry-run)
+./install.sh --repo /path/to/your/project --dry-run
 
-2. Run the installer:
-```bash
-chmod +x install.sh
-./install.sh -t /path/to/your/project
-```
+# Install
+./install.sh --repo /path/to/your/project
 
-Or to install in the current directory:
-```bash
+# Or install in the current directory
 ./install.sh
+```
+
+## Command Options
+
+### Install Script
+
+```bash
+./install.sh [OPTIONS]
+
+OPTIONS:
+    -r, --repo PATH         Target repository path (default: current directory)
+    -c, --config PATH       Path to ai-config repository (default: script directory)
+    -d, --dry-run           Show what would be done without making changes
+    -f, --force             Force refresh of existing symlinks
+    -h, --help              Show help message
+```
+
+### Examples
+
+```bash
+# Dry-run to preview changes
+./install.sh --repo ../my-project --dry-run
+
+# Normal install (skips existing files)
+./install.sh --repo ../my-project
+
+# Force refresh existing symlinks
+./install.sh --repo ../my-project --force
 ```
 
 ## What Gets Installed
@@ -79,12 +112,38 @@ The installer creates the following symbolic links in your target project:
 | `.opencode/skills/` | `ai-config/.opencode/skills/` |
 | `AGENTS.md` | `ai-config/templates/AGENTS.md` |
 
-## Benefits
+## Behavior
 
-- **Single Source of Truth**: Update configurations in one place, all projects get the changes
-- **Version Control**: Track changes to your AI configurations
-- **Easy Setup**: One command to set up AI tools in any project
-- **Backup Protection**: Existing files are automatically backed up before creating symlinks
+### Conservative by Default
+
+The installer follows these rules:
+
+1. **If nothing exists**: Creates the symlink ✓
+2. **If a symlink already exists**: Skips (use `--force` to refresh) ⚠
+3. **If a real file exists**: Reports as CONFLICT and skips ✗
+
+### Why This Approach?
+
+- **Safety**: Never accidentally overwrite your work
+- **Transparency**: You know exactly what happened
+- **Control**: You decide when to replace existing files
+- **Reversible**: Easy to undo with `--dry-run` preview
+
+## Resolving Conflicts
+
+If the installer reports conflicts:
+
+```
+✗ CONFLICT - File exists: AGENTS.md
+ℹ   Remove or rename the existing file manually, then re-run
+```
+
+Options:
+1. **Rename your file**: `mv AGENTS.md AGENTS.md.local`
+2. **Remove your file**: `rm AGENTS.md` (if you don't need it)
+3. **Merge manually**: Compare and merge the files yourself
+
+Then re-run the installer.
 
 ## Uninstallation
 
@@ -92,12 +151,20 @@ To remove ai-config from a project:
 
 ### Windows
 ```powershell
-.\uninstall.ps1 -TargetPath "C:\path\to\your\project"
+# Preview
+.\uninstall.ps1 --repo "C:\path\to\your\project" --dry-run
+
+# Remove
+.\uninstall.ps1 --repo "C:\path\to\your\project"
 ```
 
 ### Linux/Mac
 ```bash
-./uninstall.sh -t /path/to/your/project
+# Preview
+./uninstall.sh --repo /path/to/your/project --dry-run
+
+# Remove
+./uninstall.sh --repo /path/to/your/project
 ```
 
 ## Customization
@@ -122,19 +189,36 @@ git commit -m "Update AI configurations"
 git push
 ```
 
+If you need to refresh symlinks in a project (e.g., after pulling updates):
+
+```bash
+./install.sh --repo /path/to/project --force
+```
+
 ## Troubleshooting
 
 ### "Access Denied" on Windows
 Run PowerShell as Administrator (right-click → "Run as Administrator")
 
-### Symlinks already exist
-The installer will automatically remove existing symlinks and back up any regular files before creating new symlinks.
+### Symlinks already exist but point to wrong location
+Use `--force` to refresh them:
+```bash
+./install.sh --repo /path/to/project --force
+```
 
 ### Changes not reflected
 Make sure the ai-config repository is up to date:
 ```bash
 git pull
 ```
+
+## Benefits
+
+- **Single Source of Truth**: Update configurations in one place, all projects get the changes
+- **Version Control**: Track changes to your AI configurations
+- **Easy Setup**: One command to set up AI tools in any project
+- **Conservative**: Never overwrites existing files
+- **Transparent**: `--dry-run` shows exactly what will happen
 
 ## License
 
