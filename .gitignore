@@ -1,0 +1,4 @@
+# Local project management file
+# This file tracks which projects have ai-config installed locally
+# It should NOT be committed to version control
+installed-projects.md

@@ -4,24 +4,18 @@ Configuration files and settings for AI tools and agents. Installed via symlinks
 
 ## Installation
 
-```bash
+```powershell
 git clone https://github.com/PKCPablo/ai-config.git
 cd ai-config
 ```
 
 ### Quick Start
 
-```bash
+```powershell
 # Preview changes
-./install.sh --repo /path/to/project --dry-run
+.\install.ps1 --repo "C:\path\to\project" --dry-run
 
 # Install
-./install.sh --repo /path/to/project
-```
-
-**Windows:**
-```powershell
-.\install.ps1 --repo "C:\path\to\project" --dry-run
 .\install.ps1 --repo "C:\path\to\project"
 ```
 
@@ -37,11 +31,10 @@ cd ai-config
 
 ## Options
 
-```bash
-./install.sh --repo PATH      # Target project (default: current dir)
-./install.sh --dry-run        # Preview only
-./install.sh --force          # Refresh existing symlinks
-./install.sh --config PATH    # Path to ai-config repo
+```powershell
+.\install.ps1 --repo PATH      # Target project (default: current dir)
+.\install.ps1 --dry-run        # Preview only
+.\install.ps1 --force          # Refresh existing symlinks
 ```
 
 ## Behavior
@@ -50,11 +43,39 @@ cd ai-config
 - **If symlink exists**: Skipped (use `--force` to refresh) ⚠
 - **If file exists**: Reported as CONFLICT, not touched ✗
 
+## Managing Multiple Projects
+
+When you install ai-config, the project is automatically registered in `installed-projects.md` (local file, not versioned).
+
+### List installed projects
+
+```powershell
+.\list.ps1
+```
+
+### Update all projects
+
+```powershell
+# Pull latest ai-config and refresh all projects
+.\update.ps1
+
+# Preview what would be updated
+.\update.ps1 --dry-run
+```
+
+If a project no longer exists, the updater will ask if you want to:
+- **[E]** Eliminar from the list
+- **[D]** Detener the script
+- **[S]** Saltar (keep in list)
+
 ## Uninstall
 
-```bash
-./uninstall.sh --repo /path/to/project --dry-run
-./uninstall.sh --repo /path/to/project
+```powershell
+# Preview
+.\uninstall.ps1 --repo "C:\path\to\project" --dry-run
+
+# Remove
+.\uninstall.ps1 --repo "C:\path\to\project"
 ```
 
 ## License

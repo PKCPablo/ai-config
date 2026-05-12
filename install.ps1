@@ -222,6 +222,28 @@ if ($DryRun) {
 } elseif ($results.Conflicts.Count -eq 0 -and $results.Errors.Count -eq 0) {
     Write-Success "Installation complete!"
     Write-Host "Your project is now linked to ai-config."
+    
+    # Register project in installed-projects.md
+    $projectsFile = Join-Path $AiConfigPath "installed-projects.md"
+    $projectName = Split-Path -Leaf $Repo
+    
+    # Create file if it doesn't exist
+    if (-not (Test-Path $projectsFile)) {
+        @"# Proyectos con ai-config instalado
+
+| Proyecto | Ruta |
+|----------|------|
+"@ | Out-File -FilePath $projectsFile -Encoding utf8
+    }
+    
+    # Check if already registered
+    $content = Get-Content $projectsFile -Raw
+    if ($content -notmatch [regex]::Escape($Repo)) {
+        # Add new entry
+        $newLine = "| $projectName | $Repo |"
+        Add-Content -Path $projectsFile -Value $newLine
+        Write-Info "Registered in installed-projects.md"
+    }
 } else {
     Write-Warning "Installation completed with issues."
     Write-Host "Review the conflicts above and re-run after resolving them."
