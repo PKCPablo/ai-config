@@ -1,6 +1,5 @@
 ﻿{
   "$schema": "https://opencode.ai/config.json",
-
   "provider": {
     "kimi25": {
       "npm": "@ai-sdk/openai-compatible",
@@ -23,14 +22,12 @@
       }
     }
   },
-
   "model": "kimi25/Kimi-K2.5",
   "small_model": "kimi25/Kimi-K2.5",
-
+  "default_agent": "planner",
   "plugin": [
     "@warp-dot-dev/opencode-warp"
   ],
-
   "mcp": {
     "intellij": {
       "type": "remote",

@@ -1,41 +1,56 @@
-# Project Agents Configuration
+# AGENTS.md
 
-This file contains project-specific information for AI agents working on this codebase.
+## Mission
 
-## Project Overview
+Use the installed OpenCode workflows to onboard repositories and deliver minimal, reviewed, and documented changes.
 
-- **Name**: {{PROJECT_NAME}}
-- **Type**: {{PROJECT_TYPE}}
-- **Language**: {{PRIMARY_LANGUAGE}}
+## Workflow
 
-## Architecture
+1. Use `planner` for orchestration, questions, workflow selection, planning, handoffs, and git-based review.
+2. Use `/plan` for staged delivery when work needs onboarding, planning, architecture or safety review, multiple phases, or has meaningful regression risk.
+3. Use `research` for repository onboarding before planning changes in unfamiliar repos.
+4. For staged delivery, use one `code` child session per approved phase; `code` stops after each atomic stage and waits for manual validation.
+5. For quick delivery, `planner` may invoke `quickcode` for one approved low-risk task; `quickcode` works without staged pauses and reports once for planner review.
+6. Escalate quick delivery back to staged delivery if scope, risk, validation, or acceptance criteria become unclear.
+7. Use `test` when completed changes need critical testing review or regression coverage.
+8. Update durable memory under `docs/ai/` only for onboarding findings, approved plans, decisions, architecture changes, and short logs.
 
-<!-- Describe your project architecture here -->
+## Progressive Disclosure
 
-## Coding Standards
+- Read this file and the repository `README.md` first.
+- Read `docs/ai/README.md` before loading other AI memory.
+- Load only task-relevant plans, ADRs, architecture notes, or logs.
+- Run onboarding before implementation planning if `docs/ai/` memory is missing or stale.
+- Pass compact handoff briefs with paths and reasons to load references.
+- Do not paste full docs, diffs, logs, or chat transcripts into handoffs.
 
-<!-- Define coding standards and conventions -->
+## Repository Boundary
 
-## Build Commands
+- Treat the installed target repository root as the default boundary for searches, reads, edits, and commands.
+- Do not operate outside that root unless the user explicitly approves the external path.
+- Include `Repository root:` in handoffs so child agents inherit the boundary.
+- Require explicit user approval before reviewing cross-repository or external paths.
 
-```bash
-# Install dependencies
-{{INSTALL_COMMAND}}
+## Engineering Rules
 
-# Build
-{{BUILD_COMMAND}}
+- Prefer the smallest correct change.
+- Preserve unrelated user changes in the worktree.
+- Avoid speculative abstractions and broad refactors.
+- Update documentation when behavior, configuration, or workflows change.
+- Do not commit unless the user explicitly asks.
 
-# Test
-{{TEST_COMMAND}}
+## Validation Rules
 
-# Run
-{{RUN_COMMAND}}
-```
+- Start with checks closest to the changed code.
+- For staged delivery, propose manual validation commands after each atomic stage.
+- For quick delivery, report validation run and any validation still recommended in the single completion report.
+- Report exactly what was run and what was not run.
+- Treat missing validation as a review risk.
 
-## Important Notes
+## Definition Of Done
 
-<!-- Any important information agents should know -->
-
-## External Dependencies
-
-<!-- List key external dependencies and their purposes -->
+- The approved phase acceptance criteria are satisfied.
+- Staged-delivery manual checkpoints were offered between atomic stages, or quick-delivery results received planner review.
+- Relevant tests or testing rationale were reviewed.
+- Documentation and durable AI memory are updated when needed.
+- The final handoff includes changed files, validation, risks, and a proposed commit message.
