@@ -249,4 +249,35 @@ if ($DryRun) {
     Write-Host "Review the conflicts above and re-run after resolving them."
 }
 
+# Step 2: Install branch protection hook
+Write-Host ""
+Write-Host "=== Branch Protection ==="
+Write-Host ""
+
+if ($DryRun) {
+    Write-DryRun "Would install pre-push hook to prevent direct pushes to main"
+} else {
+    $hooksDir = Join-Path $Repo ".git\hooks"
+    $sourceHook = Join-Path $AiConfigPath ".git-hooks\pre-push.ps1"
+    $targetHook = Join-Path $hooksDir "pre-push"
+    
+    if (Test-Path $sourceHook) {
+        if (-not (Test-Path $hooksDir)) {
+            New-Item -ItemType Directory -Path $hooksDir -Force | Out-Null
+        }
+        
+        if (Test-Path $targetHook) {
+            $backupPath = "$targetHook.backup.$(Get-Date -Format 'yyyyMMddHHmmss')"
+            Copy-Item $targetHook $backupPath -Force
+            Write-Info "Backed up existing pre-push hook"
+        }
+        
+        Copy-Item $sourceHook $targetHook -Force
+        Write-Success "Installed pre-push hook (prevents direct push to main)"
+        Write-Info "To bypass (not recommended): git push --no-verify"
+    } else {
+        Write-Warning "pre-push hook source not found, skipping"
+    }
+}
+
 Write-Host ""

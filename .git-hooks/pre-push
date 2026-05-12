@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Pre-push hook to prevent direct pushes to main/master
+# Install: copy to .git/hooks/pre-push in your repository
+#
+
+protected_branch="main"
+
+# Check if we're pushing to the protected branch
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [ "$remote_ref" = "refs/heads/$protected_branch" ]; then
+        echo "❌ ERROR: Direct push to '$protected_branch' branch is not allowed!"
+        echo ""
+        echo "Please create a pull request instead:"
+        echo "  1. Create a new branch: git checkout -b feature/my-change"
+        echo "  2. Make your changes and commit"
+        echo "  3. Push the branch: git push origin feature/my-change"
+        echo "  4. Create a pull request on GitHub"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0

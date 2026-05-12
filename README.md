@@ -43,6 +43,25 @@ cd ai-config
 - **If symlink exists**: Skipped (use `--force` to refresh) ⚠
 - **If file exists**: Reported as CONFLICT, not touched ✗
 
+## Branch Protection (Security)
+
+ai-config automatically installs a **pre-push hook** that prevents direct pushes to `main` or `master` branches.
+
+This ensures:
+- ✅ All changes go through Pull Requests
+- ✅ Code review is enforced
+- ✅ No accidental direct pushes from OpenCode or CLI
+
+### Bypass (not recommended)
+```powershell
+git push --no-verify
+```
+
+### Manual setup (if needed)
+```powershell
+.\setup-protection.ps1 --repo "C:\path\to\project"
+```
+
 ## Managing Multiple Projects
 
 When you install ai-config, the project is automatically registered in `installed-projects.md` (local file, not versioned).
