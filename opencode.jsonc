@@ -1,0 +1,36 @@
+{
+  // Configuration file for OpenCode AI agent
+  // This file is symlinked from ai-config repository
+
+  "version": "1.0.0",
+
+  // AI Agent settings
+  "agent": {
+    "name": "OpenCode",
+    "model": "default",
+    "temperature": 0.7,
+    "maxTokens": 4096
+  },
+
+  // Project settings
+  "project": {
+    "type": "generic",
+    "language": "auto-detect"
+  },
+
+  // Features enabled
+  "features": {
+    "autoCommit": false,
+    "codeReview": true,
+    "documentation": true
+  },
+
+  // Ignore patterns
+  "ignore": [
+    "node_modules/",
+    ".git/",
+    "dist/",
+    "build/",
+    "*.log"
+  ]
+}
