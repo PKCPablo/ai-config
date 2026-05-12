@@ -82,6 +82,72 @@ The updater will:
 3. Ask for confirmation before repairing (unless `--yes` is used)
 4. Remove projects from the list if their directories no longer exist (with confirmation)
 
+## Multi-Agent System
+
+ai-config includes a sophisticated multi-agent orchestration system for complex development tasks.
+
+### Available Agents
+
+When you install ai-config in a project, the following agents become available in OpenCode:
+
+| Agent | Mode | Description |
+|-------|------|-------------|
+| **planner** | Primary | Orchestrates complex tasks by coordinating other agents |
+| **research** | Subagent | Investigates requirements and searches the codebase |
+| **code** | Subagent | Implements features and writes code |
+| **test** | Subagent | Creates and runs tests to verify functionality |
+
+### How It Works
+
+The **planner** agent (mode: primary) coordinates the workflow:
+
+```
+User Request → Planner → @research → @code → @test → Results
+```
+
+1. **Research Phase**: Planner invokes `@research` to gather information about the codebase and best practices
+2. **Code Phase**: Planner invokes `@code` to implement the feature based on research findings  
+3. **Test Phase**: Planner invokes `@test` to verify the implementation with tests
+4. **Synthesis**: Planner compiles results and presents to the user
+
+### Example Usage
+
+Simply start working on a complex task in a project with ai-config installed:
+
+```
+User: Implement JWT authentication for the API
+
+Planner: Starting research phase...
+  → @research: "Investigate current auth patterns and JWT libraries"
+
+Research: [Analyzes codebase] Found Spring Security setup. 
+         Recommend using jjwt library.
+
+Planner: Research complete. Starting implementation...
+  → @code: "Implement JWT auth with jjwt based on findings"
+
+Code: [Creates JwtUtil.java, JwtFilter.java, AuthController.java]
+      Build successful.
+
+Planner: Implementation complete. Starting testing...
+  → @test: "Create unit and integration tests"
+
+Test: [Creates JwtUtilTest.java, AuthControllerTest.java]
+      All tests passing (8/8)
+
+Planner: ✅ Task complete. Summary:
+  - JWT authentication implemented
+  - 3 new files created
+  - 8 tests created and passing
+```
+
+### Agent Permissions
+
+- **planner**: Can invoke other agents, read files, ask before editing
+- **research**: Read-only access to codebase and web search
+- **code**: Can read, edit files, and build projects
+- **test**: Can read, edit, build, and execute tests
+
 ## Uninstall
 
 ```powershell
