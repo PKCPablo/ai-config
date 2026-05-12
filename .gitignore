@@ -2,3 +2,10 @@
 # This file tracks which projects have ai-config installed locally
 # It should NOT be committed to version control
 installed-projects.md
+
+# Environment variables with secrets
+.env
+.env.local
+.env.*.local
+
+

@@ -1,36 +1,41 @@
-{
-  // Configuration file for OpenCode AI agent
-  // This file is symlinked from ai-config repository
+﻿{
+  "$schema": "https://opencode.ai/config.json",
 
-  "version": "1.0.0",
-
-  // AI Agent settings
-  "agent": {
-    "name": "OpenCode",
-    "model": "default",
-    "temperature": 0.7,
-    "maxTokens": 4096
+  "provider": {
+    "kimi25": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kimi 2.5 Azure",
+      "options": {
+        "baseURL": "{env:KIMI_BASE_URL}",
+        "apiKey": "{env:KIMI_API_KEY}",
+        "headers": {
+          "api-key": "{env:KIMI_API_KEY}",
+          "Content-Type": "application/json"
+        },
+        "queryParams": {
+          "api-version": "{env:KIMI_API_VERSION}"
+        }
+      },
+      "models": {
+        "Kimi-K2.5": {
+          "name": "Kimi K2.5"
+        }
+      }
+    }
   },
 
-  // Project settings
-  "project": {
-    "type": "generic",
-    "language": "auto-detect"
-  },
+  "model": "kimi25/Kimi-K2.5",
+  "small_model": "kimi25/Kimi-K2.5",
 
-  // Features enabled
-  "features": {
-    "autoCommit": false,
-    "codeReview": true,
-    "documentation": true
-  },
+  "plugin": [
+    "@warp-dot-dev/opencode-warp"
+  ],
 
-  // Ignore patterns
-  "ignore": [
-    "node_modules/",
-    ".git/",
-    "dist/",
-    "build/",
-    "*.log"
-  ]
+  "mcp": {
+    "intellij": {
+      "type": "remote",
+      "url": "http://localhost:64342/sse",
+      "enabled": true
+    }
+  }
 }
