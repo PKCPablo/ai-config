@@ -144,6 +144,17 @@ foreach ($link in $links) {
                     Write-DryRun "Would refresh symlink: $($link.Target)"
                     $results.Refreshed += $link.Target
                 } else {
+                    # Verify it's really a symlink before removing
+                    $item = Get-Item $targetPath
+                    $isReparsePoint = $item.Attributes -band [System.IO.FileAttributes]::ReparsePoint
+                    
+                    if (-not $isReparsePoint) {
+                        Write-Error "Cannot refresh: $($link.Target) exists but is NOT a symlink"
+                        Write-Info "It's a regular file/directory. Manual intervention required."
+                        $results.Conflicts += $link.Target
+                        continue
+                    }
+                    
                     try {
                         Remove-Item $targetPath -Force
                         if ($link.Type -eq "Directory") {
@@ -155,8 +166,30 @@ foreach ($link in $links) {
                         $results.Refreshed += $link.Target
                     }
                     catch {
-                        Write-Error "Failed to refresh symlink: $($link.Target) - $($_.Exception.Message)"
-                        $results.Errors += $link.Target
+                        Write-Error "Failed to refresh symlink: $($link.Target)"
+                        Write-Info "Error: $($_.Exception.Message)"
+                        Write-Host ""
+                        Write-Info "Options:"
+                        Write-Info "  [R]etry - Try again"
+                        Write-Info "  [S]kip - Skip this file and continue"
+                        Write-Info "  [A]bort - Stop installation"
+                        Write-Host ""
+                        $choice = Read-Host "Choose an option (R/S/A)"
+                        switch ($choice.ToUpper()) {
+                            "R" { 
+                                # Will retry on next iteration if we rethrow or handle differently
+                                # For now, treat as error
+                                $results.Errors += $link.Target
+                            }
+                            "S" {
+                                Write-Info "Skipping $($link.Target)"
+                                $results.Skipped += $link.Target
+                            }
+                            default {
+                                Write-Error "Installation aborted by user"
+                                exit 1
+                            }
+                        }
                     }
                 }
             } else {
@@ -176,18 +209,60 @@ foreach ($link in $links) {
             Write-DryRun "Would create symlink: $($link.Target) -> $($link.Source)"
             $results.Created += $link.Target
         } else {
-            try {
-                if ($link.Type -eq "Directory") {
-                    New-Item -ItemType SymbolicLink -Path $targetPath -Target $sourcePath -Force | Out-Null
-                } else {
-                    New-Item -ItemType SymbolicLink -Path $targetPath -Target $sourcePath -Force | Out-Null
+            $symlinkCreated = $false
+            $retryCount = 0
+            $maxRetries = 3
+            
+            while (-not $symlinkCreated -and $retryCount -lt $maxRetries) {
+                try {
+                    if ($link.Type -eq "Directory") {
+                        New-Item -ItemType SymbolicLink -Path $targetPath -Target $sourcePath -Force | Out-Null
+                    } else {
+                        New-Item -ItemType SymbolicLink -Path $targetPath -Target $sourcePath -Force | Out-Null
+                    }
+                    Write-Success "Created symlink: $($link.Target) -> $($link.Source)"
+                    $results.Created += $link.Target
+                    $symlinkCreated = $true
                 }
-                Write-Success "Created symlink: $($link.Target) -> $($link.Source)"
-                $results.Created += $link.Target
-            }
-            catch {
-                Write-Error "Failed to create symlink: $($link.Target) - $($_.Exception.Message)"
-                $results.Errors += $link.Target
+                catch {
+                    $retryCount++
+                    if ($retryCount -eq $maxRetries) {
+                        Write-Error "Failed to create symlink: $($link.Target)"
+                        Write-Info "Error: $($_.Exception.Message)"
+                        Write-Host ""
+                        
+                        # Check if it's a permission issue
+                        if ($_.Exception.Message -match "access|permission|denied|administrator") {
+                            Write-Error "Administrator privileges may be required to create symlinks"
+                            Write-Info "Please run PowerShell as Administrator and try again"
+                        }
+                        
+                        Write-Info "Options:"
+                        Write-Info "  [R]etry - Try again ($retryCount/$maxRetries attempts)"
+                        Write-Info "  [S]kip - Skip this file and continue"
+                        Write-Info "  [A]bort - Stop installation"
+                        Write-Host ""
+                        $choice = Read-Host "Choose an option (R/S/A)"
+                        switch ($choice.ToUpper()) {
+                            "R" { 
+                                $retryCount = 0  # Reset counter for another round
+                                Write-Info "Retrying..."
+                            }
+                            "S" {
+                                Write-Info "Skipping $($link.Target)"
+                                $results.Errors += $link.Target
+                                $symlinkCreated = $true  # Exit loop but mark as error
+                            }
+                            default {
+                                Write-Error "Installation aborted by user"
+                                exit 1
+                            }
+                        }
+                    } else {
+                        Write-Warning "Attempt $retryCount failed, retrying..."
+                        Start-Sleep -Milliseconds 500
+                    }
+                }
             }
         }
     }

@@ -1,26 +1,42 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Updates ai-config and refreshes all linked projects.
+    Updates ai-config and verifies integrity of all linked projects.
 
 .DESCRIPTION
     This script performs a git pull on ai-config repository and then
-    refreshes the symlinks in all registered projects.
+    verifies the integrity of symlinks in all registered projects.
+    Reports any issues and offers to repair them.
 
 .PARAMETER DryRun
     Show what would be done without making any changes.
+
+.PARAMETER SkipPull
+    Skip git pull and only verify integrity.
+
+.PARAMETER Yes
+    Automatically repair issues without asking for confirmation.
 
 .EXAMPLE
     .\update.ps1 --dry-run
 
 .EXAMPLE
-    .\update.ps1
+    .\update.ps1 --skip-pull
+
+.EXAMPLE
+    .\update.ps1 --yes
 #>
 
 [CmdletBinding()]
 param(
     [Parameter()]
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    [Parameter()]
+    [switch]$SkipPull,
+
+    [Parameter()]
+    [switch]$Yes
 )
 
 #Requires -RunAsAdministrator
@@ -43,7 +59,7 @@ $AiConfigPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AiConfigPath = Resolve-Path $AiConfigPath | Select-Object -ExpandProperty Path
 
 Write-Host ""
-Write-Host "=== AI-Config Updater ==="
+Write-Host "=== AI-Config Update & Integrity Check ==="
 Write-Host ""
 
 if ($DryRun) {
@@ -62,29 +78,31 @@ if (-not (Test-Path $projectsFile)) {
     exit 1
 }
 
-# Step 1: Git pull
-Write-Host "Step 1: Updating ai-config repository..."
-Write-Host ""
+# Step 1: Git pull (optional)
+if (-not $SkipPull) {
+    Write-Host "Step 1: Updating ai-config repository..."
+    Write-Host ""
 
-if ($DryRun) {
-    Write-DryRun "Would execute: git pull"
-} else {
-    Set-Location -Path $AiConfigPath
-    $gitOutput = git pull 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Repository updated successfully"
-        if ($gitOutput -match "Already up to date") {
-            Write-Info "Already up to date"
-        } else {
-            Write-Info $gitOutput
-        }
+    if ($DryRun) {
+        Write-DryRun "Would execute: git pull"
     } else {
-        Write-Error "Git pull failed: $gitOutput"
-        exit 1
+        Set-Location -Path $AiConfigPath
+        $gitOutput = git pull 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Repository updated successfully"
+            if ($gitOutput -match "Already up to date") {
+                Write-Info "Already up to date"
+            } else {
+                Write-Info $gitOutput
+            }
+        } else {
+            Write-Error "Git pull failed: $gitOutput"
+            exit 1
+        }
     }
-}
 
-Write-Host ""
+    Write-Host ""
+}
 
 # Step 2: Parse installed-projects.md
 Write-Host "Step 2: Loading registered projects..."
@@ -116,71 +134,129 @@ if ($projects.Count -eq 0) {
 Write-Info "Found $($projects.Count) registered project(s)"
 Write-Host ""
 
-# Step 3: Update each project
-Write-Host "Step 3: Updating projects..."
+# Define expected symlinks
+$expectedLinks = @(
+    @{ Target = "opencode.jsonc"; Type = "File" },
+    @{ Target = ".opencode\agents"; Type = "Directory" },
+    @{ Target = ".opencode\commands"; Type = "Directory" },
+    @{ Target = ".opencode\skills"; Type = "Directory" },
+    @{ Target = "AGENTS.md"; Type = "File" }
+)
+
+# Step 3: Verify each project
+Write-Host "Step 3: Verifying project integrity..."
 Write-Host ""
 
 $results = @{
-    Updated = @()
+    Healthy = @()
+    Issues = @()
     NotFound = @()
-    Skipped = @()
-    Failed = @()
+    Repaired = @()
 }
 
 foreach ($project in $projects) {
-    Write-Host "Processing: $($project.Name)"
+    Write-Host "Project: $($project.Name)"
     Write-Host "  Path: $($project.Path)"
     
     if (-not (Test-Path $project.Path)) {
-        Write-Warning "  Project not found at: $($project.Path)"
+        Write-Error "  Status: Directory not found"
+        $results.NotFound += $project
         
-        # Ask user what to do
+        # Ask what to do
         if (-not $DryRun) {
             Write-Host ""
             Write-Host "  What would you like to do?"
             Write-Host "  [R]emove from the list"
-            Write-Host "  [S]top the script"
-            Write-Host "  [K]eep (skip and keep in list)"
+            Write-Host "  [S]kip (keep in list)"
             Write-Host ""
             
-            $choice = Read-Host "  Choose an option (R/S/K)"
+            $choice = Read-Host "  Choose an option (R/S)"
             
-            switch ($choice.ToUpper()) {
-                "R" {
-                    # Remove from list - we'll rebuild the file
-                    $results.NotFound += $project
-                    Write-Info "  Will be removed from list"
+            if ($choice.ToUpper() -eq "R") {
+                $project.RemoveFromList = $true
+                Write-Info "  Will be removed from list"
+            } else {
+                Write-Info "  Kept in list"
+            }
+        }
+        
+        Write-Host ""
+        continue
+    }
+    
+    # Check each expected symlink
+    $projectIssues = @()
+    foreach ($link in $expectedLinks) {
+        $linkPath = Join-Path $project.Path $link.Target
+        $linkStatus = @{ Target = $link.Target; Status = "OK"; Details = "" }
+        
+        if (Test-Path $linkPath) {
+            $item = Get-Item $linkPath
+            $isSymlink = $item.Attributes -band [System.IO.FileAttributes]::ReparsePoint
+            
+            if ($isSymlink) {
+                # Verify it points to ai-config
+                $actualTarget = $item.Target
+                $expectedTarget = Join-Path $AiConfigPath $link.Target
+                if ($link.Target -eq "AGENTS.md") {
+                    $expectedTarget = Join-Path $AiConfigPath "templates\AGENTS.md"
                 }
-                "S" {
-                    Write-Error "  Script stopped by user"
-                    exit 1
+                
+                if ($actualTarget -ne $expectedTarget) {
+                    $linkStatus.Status = "WRONG_TARGET"
+                    $linkStatus.Details = "Points to: $actualTarget"
                 }
-                default {
-                    # Skip
-                    $results.Skipped += $project
-                    Write-Info "  Skipped"
-                }
+            } else {
+                $linkStatus.Status = "NOT_SYMLINK"
+                $linkStatus.Details = "Is a regular file/directory"
             }
         } else {
-            $results.Skipped += $project
-            Write-DryRun "  Would ask user (project not found)"
+            $linkStatus.Status = "MISSING"
+            $linkStatus.Details = "File does not exist"
         }
+        
+        if ($linkStatus.Status -ne "OK") {
+            $projectIssues += $linkStatus
+        }
+    }
+    
+    # Display status
+    if ($projectIssues.Count -eq 0) {
+        Write-Success "  Status: All symlinks valid"
+        $results.Healthy += $project
     } else {
-        # Project exists, update it
-        if ($DryRun) {
-            Write-DryRun "  Would refresh symlinks"
-            $results.Updated += $project
-        } else {
-            # Call install.ps1 with --force
-            $installScript = Join-Path $AiConfigPath "install\install.ps1"
-            $output = & $installScript --repo $project.Path --force 2>&1
+        Write-Warning "  Status: $($projectIssues.Count) issue(s) found"
+        foreach ($issue in $projectIssues) {
+            switch ($issue.Status) {
+                "MISSING" { Write-Error "    ❌ $($issue.Target): Missing" }
+                "NOT_SYMLINK" { Write-Warning "    ⚠️  $($issue.Target): Not a symlink ($($issue.Details))" }
+                "WRONG_TARGET" { Write-Warning "    ⚠️  $($issue.Target): Wrong target ($($issue.Details))" }
+            }
+        }
+        
+        $project.Issues = $projectIssues
+        $results.Issues += $project
+        
+        # Offer to repair
+        if (-not $DryRun) {
+            $repair = $Yes
+            if (-not $Yes) {
+                Write-Host ""
+                $choice = Read-Host "  Repair this project? (Y/N)"
+                $repair = ($choice.ToUpper() -eq "Y")
+            }
             
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "  Updated successfully"
-                $results.Updated += $project
-            } else {
-                Write-Error "  Update failed"
-                $results.Failed += $project
+            if ($repair) {
+                Write-Info "  Repairing..."
+                $installScript = Join-Path $AiConfigPath "install\install.ps1"
+                $output = & $installScript --repo $project.Path --force 2>&1
+                
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Success "  Repaired successfully"
+                    $results.Repaired += $project
+                } else {
+                    Write-Error "  Repair failed"
+                }
             }
         }
     }
@@ -189,7 +265,8 @@ foreach ($project in $projects) {
 }
 
 # Step 4: Rebuild installed-projects.md if needed (remove deleted projects)
-if ($results.NotFound.Count -gt 0 -and -not $DryRun) {
+$projectsToRemove = $projects | Where-Object { $_.RemoveFromList -eq $true }
+if ($projectsToRemove.Count -gt 0 -and -not $DryRun) {
     Write-Host "Step 4: Cleaning up projects list..."
     Write-Host ""
     
@@ -200,38 +277,35 @@ if ($results.NotFound.Count -gt 0 -and -not $DryRun) {
 "@
     
     foreach ($project in $projects) {
-        $shouldKeep = $true
-        foreach ($notFound in $results.NotFound) {
-            if ($project.Path -eq $notFound.Path) {
-                $shouldKeep = $false
-                break
-            }
-        }
-        if ($shouldKeep) {
+        if (-not $project.RemoveFromList) {
             $newContent += "`n| $($project.Name) | $($project.Path) |"
         }
     }
     
     $newContent | Out-File -FilePath $projectsFile -Encoding utf8
-    Write-Success "Removed $($results.NotFound.Count) project(s) from list"
+    Write-Success "Removed $($projectsToRemove.Count) project(s) from list"
     Write-Host ""
 }
 
 # Summary
-Write-Host "=== Update Summary ==="
+Write-Host "=== Summary ==="
 Write-Host ""
 
-if ($results.Updated.Count -gt 0) {
-    Write-Success "Updated: $($results.Updated.Count) project(s)"
+if ($results.Healthy.Count -gt 0) {
+    Write-Success "Healthy: $($results.Healthy.Count) project(s)"
+}
+if ($results.Repaired.Count -gt 0) {
+    Write-Success "Repaired: $($results.Repaired.Count) project(s)"
+}
+if ($results.Issues.Count -gt $results.Repaired.Count) {
+    $remainingIssues = $results.Issues.Count - $results.Repaired.Count
+    Write-Warning "Issues remaining: $remainingIssues project(s)"
 }
 if ($results.NotFound.Count -gt 0) {
-    Write-Warning "Removed from list: $($results.NotFound.Count) project(s)"
+    Write-Warning "Not found: $($results.NotFound.Count) project(s)"
 }
-if ($results.Skipped.Count -gt 0) {
-    Write-Warning "Skipped: $($results.Skipped.Count) project(s)"
-}
-if ($results.Failed.Count -gt 0) {
-    Write-Error "Failed: $($results.Failed.Count) project(s)"
+if ($projectsToRemove.Count -gt 0) {
+    Write-Info "Removed from list: $($projectsToRemove.Count) project(s)"
 }
 
 Write-Host ""
