@@ -31,13 +31,15 @@ This will set environment variables permanently (`KIMI_API_KEY`, `KIMI_BASE_URL`
 
 ## What Gets Linked
 
-| Target | Links To |
-|--------|----------|
-| `opencode.jsonc` | `ai-config/opencode.jsonc` |
-| `.opencode/agents/` | `ai-config/.opencode/agents/` |
-| `.opencode/commands/` | `ai-config/.opencode/commands/` |
-| `.opencode/skills/` | `ai-config/.opencode/skills/` |
-| `AGENTS.md` | `ai-config/templates/AGENTS.md` |
+When you install ai-config in a project, the following symlinks are created:
+
+| In Your Project | Points To | Type |
+|-----------------|-----------|------|
+| `opencode.jsonc` | `ai-config/opencode.jsonc` | File |
+| `.opencode/agents/` | `ai-config/.opencode/agents/` | Directory |
+| `.opencode/commands/` | `ai-config/.opencode/commands/` | Directory |
+| `.opencode/skills/` | `ai-config/.opencode/skills/` | Directory |
+| `AGENTS.md` | `ai-config/templates/AGENTS.md` | File |
 
 ## install.ps1 Options
 
