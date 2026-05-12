@@ -138,21 +138,21 @@ foreach ($project in $projects) {
         if (-not $DryRun) {
             Write-Host ""
             Write-Host "  What would you like to do?"
-            Write-Host "  [E]liminar de la lista"
-            Write-Host "  [D]etener script"
-            Write-Host "  [S]altar (mantener en lista)"
+            Write-Host "  [R]emove from the list"
+            Write-Host "  [S]top the script"
+            Write-Host "  [K]eep (skip and keep in list)"
             Write-Host ""
             
-            $choice = Read-Host "  Elige una opción (E/D/S)"
+            $choice = Read-Host "  Choose an option (R/S/K)"
             
             switch ($choice.ToUpper()) {
-                "E" {
+                "R" {
                     # Remove from list - we'll rebuild the file
                     $results.NotFound += $project
                     Write-Info "  Will be removed from list"
                 }
-                "D" {
-                    Write-Error "  Script detenido por el usuario"
+                "S" {
+                    Write-Error "  Script stopped by user"
                     exit 1
                 }
                 default {
@@ -172,7 +172,7 @@ foreach ($project in $projects) {
             $results.Updated += $project
         } else {
             # Call install.ps1 with --force
-            $installScript = Join-Path $AiConfigPath "install.ps1"
+            $installScript = Join-Path $AiConfigPath "install\install.ps1"
             $output = & $installScript --repo $project.Path --force 2>&1
             
             if ($LASTEXITCODE -eq 0) {

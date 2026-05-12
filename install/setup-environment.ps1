@@ -40,7 +40,9 @@ Write-Host ""
 # Crear symlink al repositorio
 Write-Host "Creando symlink al repositorio..." -ForegroundColor Yellow
 
-$repoPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Obtener la ruta del repositorio (padre del directorio install)
+$installPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoPath = Split-Path -Parent $installPath
 $sourceFile = Join-Path $repoPath "opencode.jsonc"
 $opencodeConfigDir = "$env:USERPROFILE\.config\opencode"
 $targetFile = Join-Path $opencodeConfigDir "opencode.json"
