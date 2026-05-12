@@ -13,10 +13,10 @@ cd ai-config
 
 ```powershell
 # Preview changes
-.\install.ps1 --repo "C:\path\to\project" --dry-run
+.\install\install.ps1 --repo "C:\path\to\project" --dry-run
 
 # Install
-.\install.ps1 --repo "C:\path\to\project"
+.\install\install.ps1 --repo "C:\path\to\project"
 ```
 
 ## What Gets Linked
@@ -32,9 +32,9 @@ cd ai-config
 ## Options
 
 ```powershell
-.\install.ps1 --repo PATH      # Target project (default: current dir)
-.\install.ps1 --dry-run        # Preview only
-.\install.ps1 --force          # Refresh existing symlinks
+.\install\install.ps1 --repo PATH      # Target project (default: current dir)
+.\install\install.ps1 --dry-run        # Preview only
+.\install\install.ps1 --force          # Refresh existing symlinks
 ```
 
 ## Behavior
@@ -43,43 +43,36 @@ cd ai-config
 - **If symlink exists**: Skipped (use `--force` to refresh) ⚠
 - **If file exists**: Reported as CONFLICT, not touched ✗
 
-## Branch Protection (Security)
-
-ai-config automatically installs a **pre-push hook** that prevents direct pushes to `main` or `master` branches.
-
-This ensures:
-- ✅ All changes go through Pull Requests
-- ✅ Code review is enforced
-- ✅ No accidental direct pushes from OpenCode or CLI
-
-### Bypass (not recommended)
-```powershell
-git push --no-verify
-```
-
-### Manual setup (if needed)
-```powershell
-.\setup-protection.ps1 --repo "C:\path\to\project"
-```
-
 ## Managing Multiple Projects
 
 When you install ai-config, the project is automatically registered in `installed-projects.md` (local file, not versioned).
 
+### Setup Environment (First Time)
+
+Configure your API keys and global OpenCode settings:
+
+```powershell
+.\install\setup-environment.ps1
+```
+
+This will:
+- Set environment variables (`KIMI_API_KEY`, `KIMI_BASE_URL`, `KIMI_API_VERSION`)
+- Create a symlink to `opencode.jsonc` in your user config directory
+
 ### List installed projects
 
 ```powershell
-.\list.ps1
+.\install\list.ps1
 ```
 
 ### Update all projects
 
 ```powershell
 # Pull latest ai-config and refresh all projects
-.\update.ps1
+.\install\update.ps1
 
 # Preview what would be updated
-.\update.ps1 --dry-run
+.\install\update.ps1 --dry-run
 ```
 
 If a project no longer exists, the updater will ask if you want to:
@@ -91,12 +84,24 @@ If a project no longer exists, the updater will ask if you want to:
 
 ```powershell
 # Preview
-.\uninstall.ps1 --repo "C:\path\to\project" --dry-run
+.\install\uninstall.ps1 --repo "C:\path\to\project" --dry-run
 
 # Remove
-.\uninstall.ps1 --repo "C:\path\to\project"
+.\install\uninstall.ps1 --repo "C:\path\to\project"
 ```
 
 ## License
 
 MIT
+
+## Install Scripts
+
+All installation and management scripts are located in the `install/` directory:
+
+| Script | Purpose |
+|--------|---------|
+| `install.ps1` | Install ai-config into a target project |
+| `uninstall.ps1` | Remove ai-config from a project |
+| `update.ps1` | Update ai-config and refresh all registered projects |
+| `list.ps1` | List all projects with ai-config installed |
+| `setup-environment.ps1` | Configure environment variables and global settings |
