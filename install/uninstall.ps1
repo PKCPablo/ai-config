@@ -30,18 +30,19 @@ param(
     [switch]$DryRun
 )
 
-# Colors for output
-$Green = "`e[32m"
-$Yellow = "`e[33m"
-$Red = "`e[31m"
-$Cyan = "`e[36m"
-$Reset = "`e[0m"
+# Colors for output (compatible with PowerShell 5.1)
+$ESC = [char]27
+$Green = "$ESC[32m"
+$Yellow = "$ESC[33m"
+$Red = "$ESC[31m"
+$Cyan = "$ESC[36m"
+$Reset = "$ESC[0m"
 
-function Write-Success { param([string]$Message) Write-Host "${Green}✓${Reset} $Message" }
-function Write-Warning { param([string]$Message) Write-Host "${Yellow}⚠${Reset} $Message" }
-function Write-Error { param([string]$Message) Write-Host "${Red}✗${Reset} $Message" }
-function Write-Info { param([string]$Message) Write-Host "${Cyan}ℹ${Reset} $Message" }
-function Write-DryRun { param([string]$Message) Write-Host "${Cyan}[DRY-RUN]${Reset} $Message" }
+function Write-Success { param([string]$Message) Write-Host "$Green[OK]$Reset $Message" }
+function Write-Warn { param([string]$Message) Write-Host "$Yellow[WARN]$Reset $Message" }
+function Write-Fail { param([string]$Message) Write-Host "$Red[ERROR]$Reset $Message" }
+function Write-Info { param([string]$Message) Write-Host "$Cyan[INFO]$Reset $Message" }
+function Write-DryRun { param([string]$Message) Write-Host "$Cyan[DRY-RUN]$Reset $Message" }
 
 # Resolve repo path
 $Repo = Resolve-Path $Repo | Select-Object -ExpandProperty Path
@@ -86,12 +87,12 @@ foreach ($link in $links) {
                 Write-DryRun "Would remove symlink: $link"
                 $results.Removed += $link
             } else {
-                Remove-Item $targetPath -Force
+                Remove-Item $targetPath -Force -Confirm:$false -Recurse -ErrorAction SilentlyContinue
                 Write-Success "Removed symlink: $link"
                 $results.Removed += $link
             }
         } else {
-            Write-Warning "Not a symlink (skipping): $link"
+            Write-Warn "Not a symlink (skipping): $link"
             $results.Skipped += $link
         }
     } else {
@@ -107,7 +108,7 @@ if (Test-Path $openCodePath) {
         if ($DryRun) {
             Write-DryRun "Would remove empty directory: .opencode"
         } else {
-            Remove-Item $openCodePath -Force
+            Remove-Item $openCodePath -Force -Confirm:$false -Recurse -ErrorAction SilentlyContinue
             Write-Success "Removed empty directory: .opencode"
         }
     }
@@ -121,7 +122,7 @@ if ($results.Removed.Count -gt 0) {
     Write-Success "Removed: $($results.Removed.Count) symlinks"
 }
 if ($results.Skipped.Count -gt 0) {
-    Write-Warning "Skipped: $($results.Skipped.Count) non-symlinks"
+    Write-Warn "Skipped: $($results.Skipped.Count) non-symlinks"
 }
 if ($results.NotFound.Count -gt 0) {
     Write-Info "Not found: $($results.NotFound.Count) links"

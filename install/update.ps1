@@ -41,21 +41,23 @@ param(
 
 #Requires -RunAsAdministrator
 
-# Colors for output
-$Green = "`e[32m"
-$Yellow = "`e[33m"
-$Red = "`e[31m"
-$Cyan = "`e[36m"
-$Reset = "`e[0m"
+# Colors for output (compatible with PowerShell 5.1)
+$ESC = [char]27
+$Green = "$ESC[32m"
+$Yellow = "$ESC[33m"
+$Red = "$ESC[31m"
+$Cyan = "$ESC[36m"
+$Reset = "$ESC[0m"
 
-function Write-Success { param([string]$Message) Write-Host "${Green}✓${Reset} $Message" }
-function Write-Warning { param([string]$Message) Write-Host "${Yellow}⚠${Reset} $Message" }
-function Write-Error { param([string]$Message) Write-Host "${Red}✗${Reset} $Message" }
-function Write-Info { param([string]$Message) Write-Host "${Cyan}ℹ${Reset} $Message" }
-function Write-DryRun { param([string]$Message) Write-Host "${Cyan}[DRY-RUN]${Reset} $Message" }
+function Write-Success { param([string]$Message) Write-Host "$Green[OK]$Reset $Message" }
+function Write-Warn { param([string]$Message) Write-Host "$Yellow[WARN]$Reset $Message" }
+function Write-Fail { param([string]$Message) Write-Host "$Red[ERROR]$Reset $Message" }
+function Write-Info { param([string]$Message) Write-Host "$Cyan[INFO]$Reset $Message" }
+function Write-DryRun { param([string]$Message) Write-Host "$Cyan[DRY-RUN]$Reset $Message" }
 
-# Determine ai-config path
-$AiConfigPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Determine ai-config path (parent of install directory)
+$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AiConfigPath = Split-Path -Parent $ScriptPath
 $AiConfigPath = Resolve-Path $AiConfigPath | Select-Object -ExpandProperty Path
 
 Write-Host ""
@@ -73,7 +75,7 @@ Write-Host ""
 # Check if installed-projects.md exists
 $projectsFile = Join-Path $AiConfigPath "installed-projects.md"
 if (-not (Test-Path $projectsFile)) {
-    Write-Error "No installed-projects.md found."
+    Write-Fail "No installed-projects.md found."
     Write-Info "Run install.ps1 first to register projects."
     exit 1
 }
@@ -96,7 +98,7 @@ if (-not $SkipPull) {
                 Write-Info $gitOutput
             }
         } else {
-            Write-Error "Git pull failed: $gitOutput"
+            Write-Fail "Git pull failed: $gitOutput"
             exit 1
         }
     }
@@ -112,22 +114,24 @@ $content = Get-Content $projectsFile -Raw
 $projects = @()
 
 # Parse markdown table (skip header rows)
-$lines = $content -split "`n" | Where-Object { $_ -match "^\|" }
+$lines = $content -split "`r?`n" | Where-Object { $_ -match "^\|" }
 for ($i = 2; $i -lt $lines.Count; $i++) {
     $line = $lines[$i].Trim()
-    if ($line -and $line -ne "") {
-        # Extract project name and path from | col1 | col2 |
-        $matches = [regex]::Matches($line, "\|\s*([^|]+)\s*\|")
-        if ($matches.Count -ge 3) {
-            $projectName = $matches[1].Groups[1].Value.Trim()
-            $projectPath = $matches[2].Groups[1].Value.Trim()
-            $projects += @{ Name = $projectName; Path = $projectPath }
+    if ($line -and $line -ne "" -and $line -notmatch "^-+") {
+        # Split by | and extract columns (skip first empty column)
+        $columns = $line.Split('|', [System.StringSplitOptions]::RemoveEmptyEntries)
+        if ($columns.Count -ge 2) {
+            $projectName = $columns[0].Trim()
+            $projectPath = $columns[1].Trim()
+            if ($projectName -and $projectPath -and $projectName -ne "Proyecto") {
+                $projects += @{ Name = $projectName; Path = $projectPath }
+            }
         }
     }
 }
 
 if ($projects.Count -eq 0) {
-    Write-Warning "No projects found in installed-projects.md"
+    Write-Warn "No projects found in installed-projects.md"
     exit 0
 }
 
@@ -159,7 +163,7 @@ foreach ($project in $projects) {
     Write-Host "  Path: $($project.Path)"
     
     if (-not (Test-Path $project.Path)) {
-        Write-Error "  Status: Directory not found"
+        Write-Fail "  Status: Directory not found"
         $results.NotFound += $project
         
         # Ask what to do
@@ -225,12 +229,12 @@ foreach ($project in $projects) {
         Write-Success "  Status: All symlinks valid"
         $results.Healthy += $project
     } else {
-        Write-Warning "  Status: $($projectIssues.Count) issue(s) found"
+        Write-Warn "  Status: $($projectIssues.Count) issue(s) found"
         foreach ($issue in $projectIssues) {
             switch ($issue.Status) {
-                "MISSING" { Write-Error "    ❌ $($issue.Target): Missing" }
-                "NOT_SYMLINK" { Write-Warning "    ⚠️  $($issue.Target): Not a symlink ($($issue.Details))" }
-                "WRONG_TARGET" { Write-Warning "    ⚠️  $($issue.Target): Wrong target ($($issue.Details))" }
+                "MISSING" { Write-Fail "    ❌ $($issue.Target): Missing" }
+                "NOT_SYMLINK" { Write-Warn "    ⚠️  $($issue.Target): Not a symlink ($($issue.Details))" }
+                "WRONG_TARGET" { Write-Warn "    ⚠️  $($issue.Target): Wrong target ($($issue.Details))" }
             }
         }
         
@@ -255,7 +259,7 @@ foreach ($project in $projects) {
                     Write-Success "  Repaired successfully"
                     $results.Repaired += $project
                 } else {
-                    Write-Error "  Repair failed"
+                    Write-Fail "  Repair failed"
                 }
             }
         }
@@ -270,15 +274,17 @@ if ($projectsToRemove.Count -gt 0 -and -not $DryRun) {
     Write-Host "Step 4: Cleaning up projects list..."
     Write-Host ""
     
-    $newContent = @"# Proyectos con ai-config instalado
+    $newContent = @"
+# Proyectos con ai-config instalado
 
 | Proyecto | Ruta |
 |----------|------|
 "@
-    
+
     foreach ($project in $projects) {
         if (-not $project.RemoveFromList) {
-            $newContent += "`n| $($project.Name) | $($project.Path) |"
+            $newLine = "`n| $($project.Name) | $($project.Path) |"
+            $newContent = $newContent + $newLine
         }
     }
     
@@ -299,10 +305,10 @@ if ($results.Repaired.Count -gt 0) {
 }
 if ($results.Issues.Count -gt $results.Repaired.Count) {
     $remainingIssues = $results.Issues.Count - $results.Repaired.Count
-    Write-Warning "Issues remaining: $remainingIssues project(s)"
+    Write-Warn "Issues remaining: $remainingIssues project(s)"
 }
 if ($results.NotFound.Count -gt 0) {
-    Write-Warning "Not found: $($results.NotFound.Count) project(s)"
+    Write-Warn "Not found: $($results.NotFound.Count) project(s)"
 }
 if ($projectsToRemove.Count -gt 0) {
     Write-Info "Removed from list: $($projectsToRemove.Count) project(s)"

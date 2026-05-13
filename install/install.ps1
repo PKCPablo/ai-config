@@ -42,21 +42,23 @@ param(
 
 #Requires -RunAsAdministrator
 
-# Colors for output
-$Green = "`e[32m"
-$Yellow = "`e[33m"
-$Red = "`e[31m"
-$Cyan = "`e[36m"
-$Reset = "`e[0m"
+# Colors for output (compatible with PowerShell 5.1)
+$ESC = [char]27
+$Green = "$ESC[32m"
+$Yellow = "$ESC[33m"
+$Red = "$ESC[31m"
+$Cyan = "$ESC[36m"
+$Reset = "$ESC[0m"
 
-function Write-Success { param([string]$Message) Write-Host "${Green}✓${Reset} $Message" }
-function Write-Warning { param([string]$Message) Write-Host "${Yellow}⚠${Reset} $Message" }
-function Write-Error { param([string]$Message) Write-Host "${Red}✗${Reset} $Message" }
-function Write-Info { param([string]$Message) Write-Host "${Cyan}ℹ${Reset} $Message" }
-function Write-DryRun { param([string]$Message) Write-Host "${Cyan}[DRY-RUN]${Reset} $Message" }
+function Write-Success { param([string]$Message) Write-Host "$Green[OK]$Reset $Message" }
+function Write-Warn { param([string]$Message) Write-Host "$Yellow[WARN]$Reset $Message" }
+function Write-Fail { param([string]$Message) Write-Host "$Red[ERROR]$Reset $Message" }
+function Write-Info { param([string]$Message) Write-Host "$Cyan[INFO]$Reset $Message" }
+function Write-DryRun { param([string]$Message) Write-Host "$Cyan[DRY-RUN]$Reset $Message" }
 
-# Determine ai-config path (where this script is located)
-$AiConfigPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Determine ai-config path (parent of install directory)
+$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AiConfigPath = Split-Path -Parent $ScriptPath
 $AiConfigPath = Resolve-Path $AiConfigPath | Select-Object -ExpandProperty Path
 
 # Resolve target repo path
@@ -88,13 +90,13 @@ $validConfig = $true
 foreach ($req in $requiredPaths) {
     $fullPath = Join-Path $AiConfigPath $req
     if (-not (Test-Path $fullPath)) {
-        Write-Error "Missing required path: $req"
+        Write-Fail "Missing required path: $req"
         $validConfig = $false
     }
 }
 
 if (-not $validConfig) {
-    Write-Error "Invalid ai-config repository structure"
+    Write-Fail "Invalid ai-config repository structure"
     exit 1
 }
 
@@ -149,14 +151,14 @@ foreach ($link in $links) {
                     $isReparsePoint = $item.Attributes -band [System.IO.FileAttributes]::ReparsePoint
                     
                     if (-not $isReparsePoint) {
-                        Write-Error "Cannot refresh: $($link.Target) exists but is NOT a symlink"
+                        Write-Fail "Cannot refresh: $($link.Target) exists but is NOT a symlink"
                         Write-Info "It's a regular file/directory. Manual intervention required."
                         $results.Conflicts += $link.Target
                         continue
                     }
                     
                     try {
-                        Remove-Item $targetPath -Force
+                        Remove-Item $targetPath -Force -Confirm:$false -Recurse -ErrorAction SilentlyContinue
                         if ($link.Type -eq "Directory") {
                             New-Item -ItemType SymbolicLink -Path $targetPath -Target $sourcePath -Force | Out-Null
                         } else {
@@ -166,7 +168,7 @@ foreach ($link in $links) {
                         $results.Refreshed += $link.Target
                     }
                     catch {
-                        Write-Error "Failed to refresh symlink: $($link.Target)"
+                        Write-Fail "Failed to refresh symlink: $($link.Target)"
                         Write-Info "Error: $($_.Exception.Message)"
                         Write-Host ""
                         Write-Info "Options:"
@@ -186,7 +188,7 @@ foreach ($link in $links) {
                                 $results.Skipped += $link.Target
                             }
                             default {
-                                Write-Error "Installation aborted by user"
+                                Write-Fail "Installation aborted by user"
                                 exit 1
                             }
                         }
@@ -194,12 +196,12 @@ foreach ($link in $links) {
                 }
             } else {
                 # Skip existing symlink
-                Write-Warning "Skipped existing symlink (use --force to refresh): $($link.Target)"
+                Write-Warn "Skipped existing symlink (use --force to refresh): $($link.Target)"
                 $results.Skipped += $link.Target
             }
         } else {
             # It's a real file/directory - CONFLICT (never touch these)
-            Write-Error "CONFLICT - File exists: $($link.Target)"
+            Write-Fail "CONFLICT - File exists: $($link.Target)"
             Write-Info "  Remove or rename the existing file manually, then re-run"
             $results.Conflicts += $link.Target
         }
@@ -227,13 +229,13 @@ foreach ($link in $links) {
                 catch {
                     $retryCount++
                     if ($retryCount -eq $maxRetries) {
-                        Write-Error "Failed to create symlink: $($link.Target)"
+                        Write-Fail "Failed to create symlink: $($link.Target)"
                         Write-Info "Error: $($_.Exception.Message)"
                         Write-Host ""
                         
                         # Check if it's a permission issue
                         if ($_.Exception.Message -match "access|permission|denied|administrator") {
-                            Write-Error "Administrator privileges may be required to create symlinks"
+                            Write-Fail "Administrator privileges may be required to create symlinks"
                             Write-Info "Please run PowerShell as Administrator and try again"
                         }
                         
@@ -254,12 +256,12 @@ foreach ($link in $links) {
                                 $symlinkCreated = $true  # Exit loop but mark as error
                             }
                             default {
-                                Write-Error "Installation aborted by user"
+                                Write-Fail "Installation aborted by user"
                                 exit 1
                             }
                         }
                     } else {
-                        Write-Warning "Attempt $retryCount failed, retrying..."
+                        Write-Warn "Attempt $retryCount failed, retrying..."
                         Start-Sleep -Milliseconds 500
                     }
                 }
@@ -280,13 +282,13 @@ if ($results.Refreshed.Count -gt 0) {
     Write-Success "Refreshed: $($results.Refreshed.Count) symlinks"
 }
 if ($results.Skipped.Count -gt 0) {
-    Write-Warning "Skipped: $($results.Skipped.Count) existing symlinks"
+    Write-Warn "Skipped: $($results.Skipped.Count) existing symlinks"
 }
 if ($results.Conflicts.Count -gt 0) {
-    Write-Error "Conflicts: $($results.Conflicts.Count) files exist (not modified)"
+    Write-Fail "Conflicts: $($results.Conflicts.Count) files exist (not modified)"
 }
 if ($results.Errors.Count -gt 0) {
-    Write-Error "Errors: $($results.Errors.Count) failed"
+    Write-Fail "Errors: $($results.Errors.Count) failed"
 }
 
 Write-Host ""
@@ -304,11 +306,13 @@ if ($DryRun) {
     
     # Create file if it doesn't exist
     if (-not (Test-Path $projectsFile)) {
-        @"# Proyectos con ai-config instalado
+        $headerContent = @"
+# Proyectos con ai-config instalado
 
 | Proyecto | Ruta |
 |----------|------|
-"@ | Out-File -FilePath $projectsFile -Encoding utf8
+"@
+        $headerContent | Out-File -FilePath $projectsFile -Encoding utf8
     }
     
     # Check if already registered
@@ -320,7 +324,7 @@ if ($DryRun) {
         Write-Info "Registered in installed-projects.md"
     }
 } else {
-    Write-Warning "Installation completed with issues."
+    Write-Warn "Installation completed with issues."
     Write-Host "Review the conflicts above and re-run after resolving them."
 }
 
