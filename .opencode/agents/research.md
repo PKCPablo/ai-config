@@ -28,6 +28,43 @@ Build a concise, durable understanding of a repository so future `planner`, `cod
 
 If a useful memory update requires touching anything outside `docs/ai/**`, stop and ask the user.
 
+## Context7 MCP for Library Documentation
+
+When investigating libraries, frameworks, or APIs, use Context7 MCP to get up-to-date documentation instead of relying on training data.
+
+### When to use Context7:
+- Need specific API documentation (Spring Security, React hooks, etc.)
+- Working with a specific version of a library
+- Need current code examples
+- Unsure about configuration options
+
+### How to use:
+
+1. **Resolve library ID:**
+   ```
+   Use tool: resolve-library-id
+   libraryName: "spring boot"
+   query: "security configuration"
+   ```
+
+2. **Query documentation:**
+   ```
+   Use tool: query-docs
+   libraryId: "/spring-projects/spring-boot"
+   query: "how to configure JWT authentication"
+   ```
+
+3. **For specific versions:**
+   ```
+   libraryId: "/spring-projects/spring-boot/2.7.0"
+   ```
+
+### Best practices:
+- Always use Context7 for library documentation questions
+- Be specific in queries: "how to configure JWT middleware" not just "JWT"
+- Include version numbers when relevant
+- Combine Context7 docs with code inspection for complete understanding
+
 ## Repository Boundary
 
 - Confirm the active repository root from the handoff `Repository root:` before onboarding; use `git rev-parse --show-toplevel` only when confirmation is needed.

@@ -177,7 +177,44 @@ Target projects maintain durable memory here:
 - **Provider:** Kimi 2.5 via Azure
 - **Model:** kimi25/Kimi-K2.5
 - **Default Agent:** planner
-- **MCP:** IntelliJ integration
+- **MCP:** IntelliJ integration + Context7
+
+### Context7 MCP (Optional Documentation)
+
+ai-config includes Context7 MCP for fetching up-to-date library documentation:
+
+```json
+"mcp": {
+  "context7": {
+    "type": "remote",
+    "url": "https://mcp.context7.com/mcp",
+    "enabled": true,
+    "headers": {
+      "CONTEXT7_API_KEY": "your-api-key"
+    }
+  }
+}
+```
+
+**What it does:**
+- Provides current documentation for libraries (Spring, React, etc.)
+- Version-specific docs (e.g., "Spring Boot 2.7" vs "3.0")
+- Real code examples from official sources
+- No more outdated training data hallucinations
+
+**Tools available:**
+- `resolve-library-id` - Find library by name
+- `query-docs` - Get specific documentation
+
+**Usage:** The research agent automatically uses Context7 when investigating libraries. No manual setup needed if configured in opencode.jsonc.
+
+**Getting an API key (optional but recommended):**
+1. Visit [context7.com/dashboard](https://context7.com/dashboard)
+2. Login with OAuth
+3. Copy your API key (starts with `ctx7sk`)
+4. Update `opencode.jsonc`
+
+*Note: Works without API key but with lower rate limits.*
 
 ### Environment Variables (set via setup-environment.ps1)
 
