@@ -25,9 +25,6 @@
   "model": "kimi25/Kimi-K2.5",
   "small_model": "kimi25/Kimi-K2.5",
   "default_agent": "planner",
-  "plugin": [
-    "@warp-dot-dev/opencode-warp"
-  ],
   "mcp": {
     "intellij": {
       "type": "remote",

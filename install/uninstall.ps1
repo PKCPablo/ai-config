@@ -100,16 +100,57 @@ foreach ($link in $links) {
     }
 }
 
-# Clean up empty .opencode directory if it exists
+# Clean up .opencode directory completely (remove all files including node_modules, package.json, etc.)
 $openCodePath = Join-Path $Repo ".opencode"
 if (Test-Path $openCodePath) {
-    $children = Get-ChildItem $openCodePath -ErrorAction SilentlyContinue
-    if (-not $children) {
-        if ($DryRun) {
-            Write-DryRun "Would remove empty directory: .opencode"
-        } else {
-            Remove-Item $openCodePath -Force -Confirm:$false -Recurse -ErrorAction SilentlyContinue
-            Write-Success "Removed empty directory: .opencode"
+    if ($DryRun) {
+        Write-DryRun "Would remove entire directory: .opencode (including node_modules, package.json, etc.)"
+    } else {
+        Remove-Item $openCodePath -Force -Confirm:$false -Recurse -ErrorAction SilentlyContinue
+        Write-Success "Removed entire directory: .opencode (including node_modules, package.json, bun.lock, .gitignore)"
+    }
+}
+
+# Determine ai-config path (parent of install directory)
+$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AiConfigPath = Split-Path -Parent $ScriptPath
+$AiConfigPath = Resolve-Path $AiConfigPath | Select-Object -ExpandProperty Path
+
+# Update installed-projects.md to remove this project
+$projectsFile = Join-Path $AiConfigPath "installed-projects.md"
+if ((Test-Path $projectsFile) -and (-not $DryRun)) {
+    $content = Get-Content $projectsFile
+    $updatedContent = @()
+    $removed = $false
+    
+    foreach ($line in $content) {
+        # Check if this line contains the repo path (matching by path)
+        if ($line -match [regex]::Escape($Repo)) {
+            $removed = $true
+            continue  # Skip this line (remove it)
+        }
+        $updatedContent += $line
+    }
+    
+    if ($removed) {
+        try {
+            $updatedContent | Out-File -FilePath $projectsFile -Encoding utf8
+            Write-Info "Removed from installed-projects.md"
+        }
+        catch {
+            Write-Warn "Could not update installed-projects.md (permission denied)"
+            Write-Info "To manually update, remove this line from installed-projects.md:"
+            Write-Host "    | $(Split-Path -Leaf $Repo) | $Repo |"
+            Write-Host ""
+            Write-Info "Or run PowerShell as Administrator and retry."
+        }
+    }
+} elseif ($DryRun -and (Test-Path $projectsFile)) {
+    $content = Get-Content $projectsFile
+    foreach ($line in $content) {
+        if ($line -match [regex]::Escape($Repo)) {
+            Write-DryRun "Would remove entry from installed-projects.md: $line"
+            break
         }
     }
 }
@@ -134,6 +175,8 @@ if ($DryRun) {
     Write-Host "${Cyan}This was a dry run. No changes were made.${Reset}"
 } else {
     Write-Host "ai-config has been uninstalled from this project."
+    Write-Host ""
+    Write-Info "Project list updated in installed-projects.md"
 }
 
 Write-Host ""

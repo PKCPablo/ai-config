@@ -17,7 +17,7 @@ cd ai-config
 .\install\setup-environment.ps1
 
 # 3. Install in your project
-.\install\install.ps1 --repo "C:\path\to\project"
+.\install\install.ps1 -Repo "C:\path\to\project"
 ```
 
 ## What Gets Linked
@@ -131,32 +131,86 @@ Located in the `install/` directory:
 | `update.ps1` | Verify integrity and update all projects |
 | `setup-environment.ps1` | Configure environment variables |
 
-### install.ps1 Options
+### Requirements
+
+- **Administrator privileges** required for all scripts (symlink creation requires elevation)
+- PowerShell 5.1 or PowerShell 7+
+- `bun` for dependency management (optional but recommended)
+
+### install.ps1
+
+Installs ai-config into a target project by creating symlinks and installing dependencies.
 
 ```powershell
-.\install\install.ps1 --repo PATH      # Target project (default: current dir)
-.\install\install.ps1 --dry-run        # Preview only
-.\install\install.ps1 --force          # Refresh existing symlinks
+# Install in current directory
+.\install\install.ps1
+
+# Install in specific project
+.\install\install.ps1 -Repo "C:\path\to\project"
+
+# Preview changes without applying
+.\install\install.ps1 -Repo "C:\path\to\project" -DryRun
+
+# Refresh existing symlinks
+.\install\install.ps1 -Repo "C:\path\to\project" -Force
 ```
 
 **Behavior:**
 - **Empty path**: Creates symlink ✓
-- **Symlink exists**: Skipped (use `--force` to refresh) ⚠
+- **Symlink exists**: Skipped (use `-Force` to refresh) ⚠
 - **Regular file exists**: Reported as CONFLICT, not touched ✗
 - **Error occurs**: Interactive prompt (Retry/Skip/Abort) ❓
 
-### Managing Multiple Projects
+**What it does:**
+1. Creates 5 symlinks (opencode.jsonc, .opencode/agents, .opencode/commands, .opencode/skills, AGENTS.md)
+2. Copies package.json and .gitignore to .opencode/
+3. Runs `bun install` to install dependencies
+4. Registers the project in `installed-projects.md`
+
+### update.ps1
+
+Updates ai-config repository and verifies integrity of all registered projects.
 
 ```powershell
-# Update and verify all registered projects
+# Update repository and verify all projects
 .\install\update.ps1
 
-# Preview only
-.\install\update.ps1 --dry-run
+# Preview only (no changes)
+.\install\update.ps1 -DryRun
 
-# Auto-repair without prompting
-.\install\update.ps1 --yes
+# Skip git pull, only verify integrity
+.\install\update.ps1 -SkipPull
+
+# Auto-repair issues without prompting
+.\install\update.ps1 -Yes
 ```
+
+**What it does:**
+1. Performs `git pull` on ai-config repository (unless `-SkipPull`)
+2. Reads `installed-projects.md` to find all registered projects
+3. Verifies all symlinks are valid in each project
+4. Reports issues (missing, broken, or wrong-target symlinks)
+5. Offers interactive repair (or auto-repair with `-Yes`)
+6. Removes entries for deleted projects
+
+### uninstall.ps1
+
+Removes ai-config from a project by deleting symlinks and cleaning up.
+
+```powershell
+# Preview uninstall
+.\install\uninstall.ps1 -Repo "C:\path\to\project" -DryRun
+
+# Execute uninstall
+.\install\uninstall.ps1 -Repo "C:\path\to\project"
+```
+
+**What it removes:**
+- All 5 symlinks (opencode.jsonc, .opencode/*, AGENTS.md)
+- Entire `.opencode/` directory including node_modules
+- Entry from `installed-projects.md`
+
+**Note:** Only removes symlinks, never touches regular files.
 
 ## Configuration
 
@@ -176,23 +230,24 @@ The `opencode.jsonc` file configures:
 - **Default Agent**: planner
 - **MCP**: IntelliJ integration
 
-## Requirements
+## Additional Requirements
 
-- Windows PowerShell 5.1 or PowerShell 7+
-- Administrator privileges (for creating symlinks)
 - Git (for update functionality)
 
-## Uninstall
+## Project Registration
 
-```powershell
-# Preview
-.\install\uninstall.ps1 --repo "C:\path\to\project" --dry-run
+Projects are automatically registered in `installed-projects.md` when installed:
 
-# Remove
-.\install\uninstall.ps1 --repo "C:\path\to\project"
+```markdown
+# Proyectos con ai-config instalado
+
+| Proyecto | Ruta |
+|----------|------|
+| my-project | C:\projects\my-project |
+| another-project | C:\projects\another-project |
 ```
 
-**Note:** Only removes symlinks, never touches regular files.
+This file is used by `update.ps1` to track and maintain all your ai-config installations.
 
 ## License
 

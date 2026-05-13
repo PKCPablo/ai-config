@@ -300,28 +300,88 @@ if ($DryRun) {
     Write-Success "Installation complete!"
     Write-Host "Your project is now linked to ai-config."
     
+    # Install node_modules for OpenCode/Bun compatibility
+    Write-Host ""
+    Write-Info "Installing OpenCode dependencies..."
+    
+    $packageJsonSource = Join-Path $AiConfigPath ".opencode\package.json"
+    $packageJsonTarget = Join-Path $Repo ".opencode\package.json"
+    
+    if (Test-Path $packageJsonSource) {
+        if (-not $DryRun) {
+            try {
+                # Copy package.json to target project
+                Copy-Item -Path $packageJsonSource -Destination $packageJsonTarget -Force
+                Write-Success "Copied package.json to .opencode/"
+                
+                # Copy .gitignore to target project
+                $gitignoreSource = Join-Path $AiConfigPath ".opencode\.gitignore"
+                $gitignoreTarget = Join-Path $Repo ".opencode\.gitignore"
+                if (Test-Path $gitignoreSource) {
+                    Copy-Item -Path $gitignoreSource -Destination $gitignoreTarget -Force
+                    Write-Success "Copied .gitignore to .opencode/"
+                }
+                
+                # Install dependencies with bun
+                $originalLocation = Get-Location
+                Set-Location -Path (Join-Path $Repo ".opencode")
+                
+                $bunInstalled = Get-Command bun -ErrorAction SilentlyContinue
+                if ($bunInstalled) {
+                    $bunOutput = bun install 2>&1
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Success "Installed dependencies with bun"
+                    } else {
+                        Write-Warn "bun install had warnings (this is usually OK)"
+                    }
+                } else {
+                    Write-Warn "bun not found in PATH. Please install bun and run 'bun install' in .opencode/"
+                }
+                
+                Set-Location -Path $originalLocation
+            }
+            catch {
+                Write-Warn "Could not install dependencies: $($_.Exception.Message)"
+                Write-Info "To manually install, run: cd '$Repo\.opencode' && bun install"
+            }
+        } else {
+            Write-DryRun "Would copy package.json and run bun install in .opencode/"
+        }
+    } else {
+        Write-Warn "package.json not found in ai-config/.opencode/"
+    }
+    
     # Register project in installed-projects.md
     $projectsFile = Join-Path $AiConfigPath "installed-projects.md"
     $projectName = Split-Path -Leaf $Repo
     
-    # Create file if it doesn't exist
-    if (-not (Test-Path $projectsFile)) {
-        $headerContent = @"
+    try {
+        # Create file if it doesn't exist
+        if (-not (Test-Path $projectsFile)) {
+            $headerContent = @"
 # Proyectos con ai-config instalado
 
 | Proyecto | Ruta |
 |----------|------|
 "@
-        $headerContent | Out-File -FilePath $projectsFile -Encoding utf8
+            $headerContent | Out-File -FilePath $projectsFile -Encoding utf8
+        }
+        
+        # Check if already registered
+        $content = Get-Content $projectsFile -Raw
+        if ($content -notmatch [regex]::Escape($Repo)) {
+            # Add new entry
+            $newLine = "| $projectName | $Repo |"
+            Add-Content -Path $projectsFile -Value $newLine
+            Write-Info "Registered in installed-projects.md"
+        }
     }
-    
-    # Check if already registered
-    $content = Get-Content $projectsFile -Raw
-    if ($content -notmatch [regex]::Escape($Repo)) {
-        # Add new entry
-        $newLine = "| $projectName | $Repo |"
-        Add-Content -Path $projectsFile -Value $newLine
-        Write-Info "Registered in installed-projects.md"
+    catch {
+        Write-Warn "Could not update installed-projects.md (permission denied)"
+        Write-Info "To manually register, add this line to installed-projects.md:"
+        Write-Host "    | $projectName | $Repo |"
+        Write-Host ""
+        Write-Info "Or run PowerShell as Administrator and retry."
     }
 } else {
     Write-Warn "Installation completed with issues."
